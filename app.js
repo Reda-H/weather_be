@@ -75,7 +75,6 @@ app.get('/search', async (req, res) => {
 
 
 function addWeatherIcon(data) {
-    console.log(data);
     let imageId = null;
     let weatherCode = data.weather[0].id;
     if (weatherCode >= 200 && weatherCode <= 232) {
