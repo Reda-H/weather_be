@@ -2,30 +2,80 @@ import * as dotenv from 'dotenv' // see https://github.com/motdotla/dotenv#how-d
 dotenv.config();
 import express from 'express';
 import fetch from 'node-fetch';
+import cors from 'cors';
+import mockData from './mockWeather.js';
+import cities from './city.list.js';
 
 
 const app = express();
 
-app.listen(3000, () => {
-    console.log('Server listening on port 3000');
+app.use(cors());
+
+app.listen(80, () => {
+    console.log('Server listening on port 80');
 });
 
 
 app.get('/weather', async (req, res) => {
-    const { city } = req.query;
+    let { city } = req.query;
+    city = city.toLowerCase()
+    console.log('request for /weather received for', city)
     const apiKey = process.env.SECRET_KEY;
     const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`;
-
-    const response = await fetch(apiUrl);
-    let data = await response.json();
-
-    data = addWeatherIcon(data);
+    let data = null;
+    
+    try {
+        const response = await fetch(apiUrl);
+        // console.log(response);
+        data = await response.json();
+        data = addWeatherIcon(data);
+    } catch (error) {
+        console.log('request failed')
+        data = mockData;
+        data = addWeatherIcon(data);
+    }
 
     res.json(data);
+    // res.send(data);
 });
 
+function autocompleteMatch(input) {
+    if (input == '') {
+      return [];
+    }
+    var reg = new RegExp(`^${input}`)
+    return cities.filter(function(city) {
+        if (city.name.toLowerCase().match(reg)) {
+          return city;
+        }
+    });
+  }
 
-function addWeatherIcon (data) {
+
+app.get('/search', async (req, res) => {
+    let {input} = req.query;
+    let listOfReturnedCities = autocompleteMatch(input).sort((a, b) => {
+        if (a.name.toUpperCase() < b.name.toUpperCase()) {
+          return -1;
+        }
+        if (a.name.toUpperCase() > b.name.toUpperCase()) {
+          return 1;
+        }
+        // names must be equal
+        return 0;
+    });
+    for(let i = 0; i < listOfReturnedCities.length - 1; i++) {
+        if(listOfReturnedCities[i].name === listOfReturnedCities[i+1].name) {
+            listOfReturnedCities.splice(i, 1);
+            i--;
+        }
+    }
+    res.json(listOfReturnedCities.slice(0,10));
+})
+
+
+function addWeatherIcon(data) {
+    console.log(data);
     let imageId = null;
     let weatherCode = data.weather[0].id;
     if (weatherCode >= 200 && weatherCode <= 232) {
@@ -62,7 +112,7 @@ function addWeatherIcon (data) {
             imageId += 'n';
         }
     }
-    const image = `https://openweathermap.org/img/wn/${imageId}@2x.png`;
+    const image = `https://openweathermap.org/img/wn/${imageId}@4x.png`;
 
     return {
         ...data,
